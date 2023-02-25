@@ -1,0 +1,357 @@
+#include <SFML/Graphics.hpp>
+#include <time.h>
+#include <string>
+#include <sstream>
+
+using namespace sf;
+
+int ts = 54; //tile size
+Vector2i offset(48,24);
+//FUNCTION PROTOTYPES
+void find_match();
+bool lose(int m);
+void grid_updation(bool& isMoving);
+int score_updation();
+void no_match(bool& isSwap, bool& isMoving, int& score, int& old_y, int& y, int& x, int& old_x);
+void animation(bool& isMoving);
+
+struct piece
+{ 
+	int x;
+	int y;
+	int col;
+	int row;
+	int kind;
+	int match;
+	int alpha;
+	piece(){match=0; alpha=255;}
+} 
+grid[10][10];
+
+void swap(piece p1,piece p2)
+{
+  std::swap(p1.col,p2.col);
+  std::swap(p1.row,p2.row);
+
+  grid[p1.row][p1.col]=p1;
+  grid[p2.row][p2.col]=p2;
+}
+
+
+int main()
+{
+    srand(time(0));
+
+    RenderWindow app(VideoMode(740,480), "Menargerie");
+    app.setFramerateLimit(60);
+
+    Texture t1,t2, t3, t4, t5;
+    t1.loadFromFile("sprites/background.png");
+    t2.loadFromFile("sprites/animals.png");
+    t3.loadFromFile("sprites/menu.png"); //MENU AND OTHER SPRITES LOADED FROM FILES
+    t4.loadFromFile("sprites/pMenu.png");
+    t5.loadFromFile("sprites/Lselect.png");
+
+    Sprite background(t1), gems(t2), menu(t3), pause(t4), Lselect(t5);
+    //STRING FOR MOVES DECLARED ALONG WITH STRING STREAM TO CONVERT INTEGER TO STRING (FOR DISPLAYING)
+    std::string int_moves;
+    std::stringstream transfer;
+    
+    //TEXT OBJECT DECLARED TO DISPLAY NUMBER OF MOVES LEFT
+    Text num_moves;
+    //FONT OBJECT TO BE LOADED INTO MOVE TEXT
+    Font font;
+    font.loadFromFile(("fonts/font.ttf"));
+	//STYLING OF TEXT OBJECT
+    num_moves.setFont(font);
+    
+    num_moves.setString(int_moves);
+    
+    num_moves.setCharacterSize(40);
+    
+    num_moves.setFillColor(sf::Color::White);
+    
+    num_moves.setStyle(sf::Text::Bold | sf::Text::Underlined);
+
+    for (int i=1;i<=8;i++)
+		for (int j=1;j<=8;j++)
+		{
+		      grid[i][j].kind=rand()%3;
+		      grid[i][j].col=j;
+		      grid[i][j].row=i;
+		      grid[i][j].x = j*ts;
+		      grid[i][j].y = i*ts;
+		}
+
+    int old_x,old_y,x,y;
+    Vector2i pos;
+    int moves=50;
+    int score=0;
+    int game_mode=1;
+    bool isSwap=false, isMoving=false, flag1=false, flag2=false, flag3=false;
+
+    while (app.isOpen())
+    {
+        Event e;
+        Event a;//MENU EVENT
+        Event b;//LEVEL SELECT EVENT
+        Event c;//PAUSE EVENT
+        //DISPLAYS MENU UNTIL USER PRESSES PROPER KEY
+        app.draw(menu);
+        app.display();
+        while (app.pollEvent(a))
+        {
+            if (a.type == Event::Closed)
+                app.close();
+                   
+            if (a.type == Event::KeyPressed)
+            {
+                if (a.key.code == Keyboard::Num1)//IF '1' KEY PRESSED GAME STARTS
+                {
+                	flag1=true;
+                	break;
+                }
+                else if(a.key.code == Keyboard::Num2)//IF '2' KEY PRESSED LEVEL SELECT STARTS
+                {
+                	flag2=false;
+                	while(flag2==false)
+                	{
+		            	while (app.pollEvent(b))
+						{
+							app.draw(Lselect);
+        					app.display();
+							if (b.type == Event::Closed)
+								app.close();
+								   
+							if (b.type == Event::KeyPressed)
+							{
+								if (b.key.code == Keyboard::Num1)//IF '1' KEY PRESSED GAME MODE SET TO 1
+								{
+									game_mode=1;
+									flag2=true;
+									break;
+								}
+								if (b.key.code == Keyboard::Num2)//IF '2' KEY PRESSED GAME MODE SET TO 2
+								{
+									game_mode=2;
+									flag2=true;
+									break;
+								}
+							 }
+						 }
+					 }
+                }
+                else if(a.key.code == Keyboard::Num3)
+                	return 0;
+            }
+                	
+        }
+        ////////////////////////////////////////////////////////////
+        if(flag1==true)//GAME STARTS IF USER PRESSES 1
+        {
+        	while(flag1)
+        	{
+				while (app.pollEvent(e))
+				{
+				    if (e.type == Event::Closed)
+				        app.close();
+				           
+				    if (e.type == Event::MouseButtonPressed)
+				    {
+				    	//WHEN LEFT MOUSE BUTTON PRESSED AND GAME IS NOT SWAPPING OR ANIMATING IT GETS COORDINATES 
+				        if (e.mouseButton.button == Mouse::Left)
+				        {
+				           	if (!isSwap && !isMoving)
+				           	{
+				        		pos = Mouse::getPosition(app)-offset;
+				        		old_x=pos.x/ts+1;
+				  				old_y=pos.y/ts+1;
+				  			}
+				        }
+				     }
+				     if (e.type == Event::MouseButtonReleased)//WHEN MOUSE BUTTON IS RELEASED NEW COORDINATES ARE STORED AND SWAPPED
+				     {
+				     	pos= Mouse::getPosition(app)-offset;
+				   		x=pos.x/ts+1;
+				  		y=pos.y/ts+1;
+					 	if (abs(x-old_x)+abs(y-old_y)==1)
+					 	{
+							{swap(grid[old_y][old_x],grid[y][x]); isSwap=1;}
+							moves--;
+						}
+				     }
+				     if(e.type == Event::KeyPressed)//IF USER PRESSES 'P' KEY THEN PAUSE MENU APPEARS IN A LOOP UNTIL USER PRESSES SPECIFIED KEYS
+				     {
+				     	if (e.key.code == Keyboard::P)
+				        {
+				        	flag3=false;
+				        	while(flag3==false)
+							{
+								while(app.pollEvent(c))
+								{
+									app.draw(pause);
+									app.display();
+									if (c.type == Event::Closed)
+										app.close();
+										   
+									if (c.type == Event::KeyPressed)
+									{
+										if (c.key.code == Keyboard::Num1)//BREAKS LOOP AND CONTINUES GAME
+										{
+											flag3=true;
+											break;
+										}
+										if (c.key.code == Keyboard::Num2)//EXITS GAME
+											return 0;
+									 }
+				        		}
+				        	}
+				        }
+				     }
+									     
+				}
+				//FUNCTION CALLING
+//////////////////////////////////////////////////////////////////////////////////
+				find_match();//FINIDING MATCH FUNTION
+				transfer<<moves<<" ";
+				transfer>>int_moves;//TRANSFERS INETEGER MOVES TO STRING 
+				num_moves.setString(int_moves);//UPDATES TEXT OBJECT
+				
+				if(lose(moves))//IF LOSE FUNTION RETURNS TRUE GAME EXITS
+					return 0;
+				animation(isMoving);
+				score+=score_updation();
+				no_match(isSwap, isMoving, score, old_y, y, x, old_x); 
+				grid_updation(isMoving);
+				//////draw///////
+				app.draw(background);
+
+				for (int i=1;i<=8;i++)
+					for (int j=1;j<=8;j++)
+					{
+						piece p = grid[i][j];
+						gems.setTextureRect( IntRect(p.kind*49,0,45,45));
+						gems.setColor(Color(255,255,255,p.alpha));
+						gems.setPosition(p.x,p.y);
+						gems.move(offset.x-ts,offset.y-ts);
+						app.draw(gems);
+					}
+				num_moves.setPosition(600,100);
+				app.draw(num_moves);
+				app.display();
+			}
+		}
+	}
+    return 0;
+}
+////////////////////////////////////////FUNCTIONS///////////////////////////
+bool lose(int m)//FUNCTION TO CHECK IF MOVES HAVE FINSIHED
+{
+	if(m<=0)
+		return true;
+	else
+		return false;
+}
+void find_match()//FUNCTION TO SEE IF MATCH
+{
+	int x=1;
+	do
+	{
+		int y=1;
+		do
+		{
+			if (grid[x][y].kind==grid[x+1][y].kind)
+				if (grid[x][y].kind==grid[x-1][y].kind)
+					for(int n=-1;n<=1;n++)
+						grid[x+n][y].match++;
+			if (grid[x][y].kind==grid[x][y+1].kind)
+				if (grid[x][y].kind==grid[x][y-1].kind)
+					 for(int n=-1;n<=1;n++)
+					 	grid[x][y+n].match++;
+			y++;
+		}
+		while(y<=8);
+		x++;
+	}
+	while(x<=8);
+
+
+}
+void grid_updation(bool& isMoving)//UPDATES GRID AFTER ANIMATION
+{
+	if (isMoving==false)
+	{
+		for(int i=8;i>0;i--)
+			for(int j=1;j<=8;j++)
+				if (grid[i][j].match)
+					for(int n=i;n>0;n--)
+						if (!grid[n][j].match) {swap(grid[n][j],grid[i][j]); break;};
+
+		for(int j=1;j<=8;j++)
+			for(int i=8,n=0;i>0;i--)
+				if (grid[i][j].match)
+				{
+					grid[i][j].kind = rand()%7;
+					grid[i][j].y = -ts*n++;
+					grid[i][j].match=0;
+					grid[i][j].alpha = 255;
+				}
+	}
+}
+int score_updation()//UPDATES SCORE
+{
+	int points;
+	for (int i=1;i<=8;i++)
+		for (int j=1;j<=8;j++)
+			points+=grid[i][j].match;
+			
+	return points;
+
+}
+void no_match(bool& isSwap, bool& isMoving, int& score, int& old_y, int& y, int& x, int& old_x)//CHECKS IF THERE IS NO MATCH
+{
+	if (isSwap && !isMoving)
+		{if (!score) swap(grid[old_y][old_x],grid[y][x]); isSwap=0;}
+} 
+void animation(bool& isMoving)//FOR ANIMATING FALLING BLOCKS AND DELETING BLOCKS
+{
+	isMoving=false;
+	int z=1;
+	do
+	{
+		int y=1;
+		do
+		{
+			piece &p = grid[z][y];
+			int dx,dy;
+			int x=0;
+			do
+			{
+				{dx = p.x-p.col*ts;
+				dy = p.y-p.row*ts;
+				if (dx)
+					p.x-=dx/abs(dx);
+				if (dy)
+					p.y-=dy/abs(dy);}
+				if (dx||dy)
+					isMoving=true;
+				x++;
+			}
+			while(x<10);
+			y++;
+		}
+		while(y<=8);
+		z++;
+	}
+	while(z<=8);
+				
+
+	if (isMoving==false)
+	{
+		for (int i=1;i<=8;i++)
+			for (int j=1;j<=8;j++)
+				if (grid[i][j].match) 
+					if (grid[i][j].alpha>10) 
+						{grid[i][j].alpha-=10; isMoving=true;}
+	}
+}
